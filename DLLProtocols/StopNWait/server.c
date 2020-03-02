@@ -5,15 +5,43 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <math.h>
 
 typedef struct {
    int seq_no;
-   char buffer;
+   int ack_no;
+   int buffer;
 } frame;
 
 void error(char *msg) {
     perror(msg);
     exit(1);
+}
+
+int add_error(char c) {
+    int no_of_ones, i;
+    int bin[8];
+    int n;
+
+    for (i = 0; i < 8; i++) {
+       bin[i] = !!((c << i) & 0x80);
+       if (bin[i] == 1) { no_of_ones++; }
+    }
+
+    // if (no_of_ones%2 != 0) { n += 1; }
+
+    for(int i=1;i<8;++i) { bin[i-1] = bin[i]; }
+    bin[7] = no_of_ones%2 == 0 ? 0 : 1;
+
+    // introducing error
+    bin[4] = bin[4] == 0 ? 1 : 0;
+
+    n = 0;
+    for(int i=7;i>=0;--i) {
+        n += pow(2, i) * bin[i];
+    }
+
+    return n;
 }
 
 int main(int argc, char *argv[]) {
@@ -49,8 +77,9 @@ int main(int argc, char *argv[]) {
           error("ERROR on accept");
      //while(1) {
      for(int i=0;i<length;++i) {
-	s -> buffer = msg[i];
+	s -> buffer = add_error(msg[i]);
 	s -> seq_no = i%2;
+	printf("Sending message: %d\n", s->buffer);
 
     	//n = read(newsockfd,buffer,255);
      	//if (n < 0) error("ERROR reading from socket");
@@ -64,7 +93,7 @@ int main(int argc, char *argv[]) {
 	// waiting for acknowledgement
 	frame* ack = (frame*) malloc(sizeof(frame));
 	n = read(newsockfd, ack, sizeof(frame));
-	printf("Ack number: %d\n", ack -> seq_no);
+	printf("Ack number: %d\n", ack -> ack_no);
      }
      return 0;
 }
